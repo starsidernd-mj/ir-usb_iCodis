@@ -6,7 +6,7 @@
  * LibUSB port: Rabit
  */
 
-#include "TiqiaaUsb.h"
+#include "TiqiaaUsb.hpp"
 #include <cstring>
 #include <stdlib.h>
 
@@ -281,33 +281,67 @@ void TiqiaaUsbIr::WriteIrNecSignalPulse(TqIrWriteData * IrWrData, int PulseCount
         IrWrData->Buf[IrWrData->Size] = SendBlockSize;
         IrWrData->Size ++;
     }
+    //fprintf(stderr, "DEBUG: Pulsetime: %0d\n", IrWrData->PulseTime);
 }
 
 int TiqiaaUsbIr::WriteIrNecSignal(uint16_t IrCode, uint8_t * OutBuf) {
     TqIrWriteData WriteData;
     int i;
     uint32_t tcode;
+    uint32_t rscode;
 
     WriteData.Buf = OutBuf;
     WriteData.Size = 0;
     WriteData.PulseTime = 0;
     WriteData.SenderTime = 0;
-
-    ((uint8_t *)(&tcode))[0] = ((uint8_t *)(&IrCode))[1];
+    
+    // LSB gen
+    /*((uint8_t *)(&tcode))[0] = ((uint8_t *)(&IrCode))[1];
     ((uint8_t *)(&tcode))[1] = ~((uint8_t *)(&IrCode))[1];
     ((uint8_t *)(&tcode))[2] = ((uint8_t *)(&IrCode))[0];
-    ((uint8_t *)(&tcode))[3] = ~((uint8_t *)(&IrCode))[0];
+    ((uint8_t *)(&tcode))[3] = ~((uint8_t *)(&IrCode))[0];*/
 
-    WriteIrNecSignalPulse(&WriteData, 16, true);
-    WriteIrNecSignalPulse(&WriteData, 8, false);
-
-    for( i=0; i<32;i++ ) {
-        WriteIrNecSignalPulse(&WriteData, 1, true);
-        WriteIrNecSignalPulse(&WriteData, ((tcode&1) != 0) ? 3 : 1, false);
+    // MSB gen
+    ((uint8_t *)(&tcode))[3] = ((uint8_t *)(&IrCode))[1];
+    ((uint8_t *)(&tcode))[2] = ~((uint8_t *)(&IrCode))[1];
+    ((uint8_t *)(&tcode))[1] = ((uint8_t *)(&IrCode))[0];
+    ((uint8_t *)(&tcode))[0] = ~((uint8_t *)(&IrCode))[0];
+        
+    //fprintf(stderr, "DEBUG: %X\n", (tcode));
+    
+    // reverse the hex string so that we can send the MSB of the generated message
+    // without having to redo the LSB decoder below
+    for(i=0; i<32; i++) {
+        rscode <<= 1;
+        rscode |= (tcode & 1);
         tcode >>= 1;
     }
+    
+    //fprintf(stderr, "DEBUG: %X\n", (rscode));
+
+    // this looks like it generates an empty header, with 16*NEC_UNIT for HDR_MARK
+    // followed by 8*NEC_UNIT for HDR_SPACE
+    // write now WriteData is empty with size 0
+    //fprintf(stderr, "Header\n");
+    WriteIrNecSignalPulse(&WriteData, 16, true);
+    //fprintf(stderr, "Header\n");
+    WriteIrNecSignalPulse(&WriteData, 8, false);
+
+    //fprintf(stderr, "Data\n");
+    
+    //LSB
+    for( i=0; i<32;i++ ) {
+        WriteIrNecSignalPulse(&WriteData, 1, true);
+        WriteIrNecSignalPulse(&WriteData, ((rscode&1) != 0) ? 3 : 1, false);
+        rscode >>= 1;
+        //fprintf(stderr, "\n");
+    }
+    
+    //fprintf(stderr, "Footer\n");
     WriteIrNecSignalPulse(&WriteData, 1, true);
-    WriteIrNecSignalPulse(&WriteData, 72, false);
+    //WriteIrNecSignalPulse(&WriteData, 72, false);
+    //fprintf(stderr, "Footer\n");
+    WriteIrNecSignalPulse(&WriteData, 3, false);
     return WriteData.Size;
 }
 

@@ -109,8 +109,11 @@ private:
     static const uint16_t IrReplyWaitTimeout = 2000;
 
     static const int NecPulseSize = 1125; //562.5 mks
+    //static const int NecPulseSize = 1040; //560 mks
+    //static const int NecPulseSize = 560; //560 mks
     static const int IrSendTickSize = 32; //16 mks
     static const int MaxIrSendBlockSize = 127; //ticks
+
 
     libusb_device_handle *dev_h;
     struct thread_info_t read_thread_info;
