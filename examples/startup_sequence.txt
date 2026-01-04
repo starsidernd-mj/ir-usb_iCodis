@@ -1,0 +1,12 @@
+10d0
+#wake
+10e8
+#wait
+10ca
+10ca
+1038
+#wait
+108a
+104a
+10a8
+#quit
